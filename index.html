@@ -129,74 +129,116 @@
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
+    function clearUrbanLayers() {
+    // Clear all layers from the map
+        for (const layer in layers) {
+            if (layers[layer]) {
+                layers[layer].clearLayers();
+            }
+        }
+
+        // Also clear any residual circle drawn directly on the map
+        map.eachLayer(layer => {
+            if (layer instanceof L.Circle) {
+                map.removeLayer(layer);
+            }
+        });
+    }
+
     function generateUrbanPlan() {
         const lat = parseFloat(document.getElementById('lat').value);
         const lng = parseFloat(document.getElementById('lng').value);
         const radius = parseInt(document.getElementById('radius').value);
-    
+
         if (!lat || !lng || isNaN(radius) || radius <= 0) {
             alert("Invalid coordinates or radius.");
             return;
         }
-    
+
+        // Clear previous layers, including circles
         clearUrbanLayers();
-    
+
+        // Add the boundary circle
         L.circle([lat, lng], { radius: radius, color: 'black', weight: 1, fillColor: 'transparent' })
             .addTo(map);
-    
+
+        // Add components to the map
         addRestrictedAreas(lat, lng, radius);
-    
+
         if (document.getElementById('showBuildings').checked) generateBuildings(lat, lng, radius);
         if (document.getElementById('showRoads').checked) generateRoads(lat, lng, radius);
         if (document.getElementById('showSewage').checked) generateSewage(lat, lng, radius);
         if (document.getElementById('showDrainage').checked) generateDrainage(lat, lng, radius);
         if (document.getElementById('showParks').checked) generateParks(lat, lng, radius);
-    
+
+        // Add all updated layers to the map
         for (const layer in layers) {
             layers[layer].addTo(map);
         }
     }
 
+
     function generateBuildings(lat, lng, radius) {
-        const numBuildingsPerRow = parseInt(document.getElementById('numBuildings').value) || 10;
-        const buildingSpacing = (2 * radius) / numBuildingsPerRow;
-    
-        console.log("Building grid generation started");
-        
-        for (let i = 0; i < numBuildingsPerRow; i++) {
-            for (let j = 0; j < numBuildingsPerRow; j++) {
-                const offsetLat = (i - numBuildingsPerRow / 2) * buildingSpacing / 111320;
-                const offsetLng = (j - numBuildingsPerRow / 2) * buildingSpacing / (111320 * Math.cos(lat * Math.PI / 180));
-                const buildingLat = lat + offsetLat;
-                const buildingLng = lng + offsetLng;
-    
-                const distanceFromCenter = Math.sqrt(
-                    Math.pow(buildingLat - lat, 2) + Math.pow(buildingLng - lng, 2)
-                ) * 111320;
-    
-                // Only add buildings within the specified radius
-                if (distanceFromCenter <= radius) {
-                    const building = L.rectangle(
-                        [
-                            [buildingLat - 0.00005, buildingLng - 0.00005],
-                            [buildingLat + 0.00005, buildingLng + 0.00005]
-                        ],
-                        {
-                            color: 'red',
-                            weight: 1,
-                            fillColor: 'red',
-                            fillOpacity: 0.5
-                        }
-                    ).addTo(layers.buildings);
-    
-                    // Debug: Log building placement
-                    console.log("Building added at:", buildingLat, buildingLng);
-                }
-            }
+        const numBuildings = parseInt(document.getElementById('numBuildings').value) || 10;
+
+        console.log("Building generation started");
+
+        const restrictedAreas = [
+            { lat: lat + 0.002, lng: lng + 0.002, radius: 100 }, // Radius in meters
+            { lat: lat - 0.002, lng: lng - 0.002, radius: 100 },
+        ];
+
+        function isInsideRestrictedArea(buildingLat, buildingLng) {
+            return restrictedAreas.some(area => {
+                const distance = Math.sqrt(
+                    Math.pow((buildingLat - area.lat) * 111320, 2) +
+                    Math.pow((buildingLng - area.lng) * (111320 * Math.cos(lat * Math.PI / 180)), 2)
+                );
+                return distance <= area.radius;
+            });
         }
-    
+
+        let buildingsPlaced = 0;
+
+        while (buildingsPlaced < numBuildings) {
+            // Generate a random angle and distance within the circle
+            const angle = Math.random() * 2 * Math.PI; // Random angle in radians
+            const distance = Math.random() * radius; // Random distance within radius
+
+            // Convert polar coordinates to latitude and longitude
+            const offsetLat = distance * Math.cos(angle) / 111320;
+            const offsetLng = distance * Math.sin(angle) / (111320 * Math.cos(lat * Math.PI / 180));
+
+            const buildingLat = lat + offsetLat;
+            const buildingLng = lng + offsetLng;
+
+            // Skip if the building is inside a restricted area
+            if (isInsideRestrictedArea(buildingLat, buildingLng)) {
+                continue;
+            }
+
+            // Add the building if it is outside restricted areas
+            L.rectangle(
+                [
+                    [buildingLat - 0.00005, buildingLng - 0.00005],
+                    [buildingLat + 0.00005, buildingLng + 0.00005]
+                ],
+                {
+                    color: 'red',
+                    weight: 1,
+                    fillColor: 'red',
+                    fillOpacity: 0.5
+                }
+            ).addTo(layers.buildings);
+
+            buildingsPlaced++;
+            console.log("Building added at:", buildingLat, buildingLng);
+        }
+
         console.log("Building generation completed");
     }
+
+
 
     function generateRoads(lat, lng, radius) {
         const numRoads = 8; 
@@ -303,12 +345,6 @@
                 .bindPopup("Restricted Area")
                 .addTo(layers.restrictedAreas);
         });
-    }
-
-    function clearUrbanLayers() {
-        for (const layer in layers) {
-            layers[layer].clearLayers();
-        }
     }
 
     function resetMap() {
