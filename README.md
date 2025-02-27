@@ -1,7 +1,5 @@
 # PlanIt 
 
-$ Overview
-
 The Urban Planning Map is a web-based interactive mapping tool that allows users to visualize and configure urban planning elements such as buildings, roads, sewage systems, drainage, parks, and restricted areas. The application uses Leaflet.js for rendering maps and provides a user-friendly sidebar for customization.
 
 # Features
@@ -18,7 +16,7 @@ The Urban Planning Map is a web-based interactive mapping tool that allows users
 
 🔄 Reset Map & Update Map Center dynamically.
 
-#Technologies Used
+# Technologies Used
 
 HTML, CSS, JavaScript
 
